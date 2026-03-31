@@ -57,6 +57,7 @@ const StatusBadge=({status,msg,onClose}: any)=>{
 };
 
 export default function App(){
+  console.log("[App] Rendering...");
   const [screen,setScreen]=useState("splash");
   const [user,setUser]=useState<any>(null); // {name,email,ghlContactId}
   const [entries,setEntries]=useState<any[]>([]);
@@ -81,9 +82,20 @@ export default function App(){
 
   // === LOAD ===
   useEffect(()=>{
+    console.log("[App] useEffect Load starting...");
     (async()=>{
       let hasUser=false;
-      try{const u=await (window as any).storage.get("cobro-user");if(u){setUser(JSON.parse(u.value));hasUser=true}}catch{}
+      try{
+        console.log("[App] Checking for stored user...");
+        const u=await (window as any).storage.get("cobro-user");
+        if(u){
+          console.log("[App] Stored user found:", u.value);
+          setUser(JSON.parse(u.value));
+          hasUser=true;
+        }
+      }catch(e){
+        console.error("[App] Error loading user from storage:", e);
+      }
       try{const e=await (window as any).storage.get("cobro-entries");if(e)setEntries(JSON.parse(e.value))}catch{}
       try{const g=await (window as any).storage.get("cobro-goal");if(g)setGoal(Number(g.value))}catch{}
       await loadShared();
