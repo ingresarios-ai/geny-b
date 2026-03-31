@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
+import { supabase } from "./supabase";
 
 const C = {
   bg:"#0a0e1a",card:"#131a2e",cardL:"#1a2340",accent:"#00e5ff",accentDk:"#0091a1",
@@ -87,17 +88,25 @@ export default function App(){
       let hasUser=false;
       try{
         console.log("[App] Checking for stored user...");
-        const u=await (window as any).storage.get("cobro-user");
+        const u = localStorage.getItem("cobro-user");
         if(u){
-          console.log("[App] Stored user found:", u.value);
-          setUser(JSON.parse(u.value));
-          hasUser=true;
+          const parsed = JSON.parse(u);
+          // fetch from supabase to verify
+          const {data: prof} = await supabase.from('profiles').select('*').eq('email', parsed.email).maybeSingle();
+          if (prof) {
+              const fullU = {id: prof.id, name: prof.full_name, email: prof.email, profession: prof.profession};
+              setUser(fullU);
+              localStorage.setItem("cobro-user", JSON.stringify(fullU));
+              hasUser=true;
+              
+              const {data: myE} = await supabase.from('entries').select('*').eq('user_id', prof.id);
+              if (myE) setEntries(myE);
+          }
         }
       }catch(e){
-        console.error("[App] Error loading user from storage:", e);
+        console.error("[App] Error loading user:", e);
       }
-      try{const e=await (window as any).storage.get("cobro-entries");if(e)setEntries(JSON.parse(e.value))}catch{}
-      try{const g=await (window as any).storage.get("cobro-goal");if(g)setGoal(Number(g.value))}catch{}
+      try{const g=localStorage.getItem("cobro-goal");if(g)setGoal(Number(g))}catch{}
       await loadShared();
       setTimeout(()=>setSplashOp(1),100);
       setTimeout(()=>{setSplashOp(0);setTimeout(()=>setScreen(hasUser?"main":"login"),600)},2800);
@@ -105,53 +114,28 @@ export default function App(){
   },[]);
 
   const loadShared=async()=>{
-    try{const ae=await (window as any).storage.get("cobro-all-entries",true);if(ae)setAllEntries(JSON.parse(ae.value))}catch{}
-    try{const au=await (window as any).storage.get("cobro-all-users",true);if(au)setAllUsers(JSON.parse(au.value))}catch{}
-  };
-
-  const saveEntries=useCallback(async(ne: any[],usr?: any)=>{
-    setEntries(ne);try{await (window as any).storage.set("cobro-entries",JSON.stringify(ne))}catch{}
-    const u=usr||user;if(!u)return;
     try{
-      let ae: any[]=[];try{const r=await (window as any).storage.get("cobro-all-entries",true);if(r)ae=JSON.parse(r.value)}catch{}
-      ae=ae.filter(e=>e.userEmail!==u.email);
-      const tagged=ne.map(e=>({...e,userName:u.name,userEmail:u.email}));
-      await (window as any).storage.set("cobro-all-entries",JSON.stringify([...ae,...tagged]),true);
-      setAllEntries([...ae,...tagged]);
-    }catch{}
-  },[user]);
-
-  const registerSharedUser=async (u: any)=>{
-    try{
-      let au: any[]=[];try{const r=await (window as any).storage.get("cobro-all-users",true);if(r)au=JSON.parse(r.value)}catch{}
-      if(!au.find(x=>x.email===u.email))au.push({name:u.name,email:u.email,profession:u.profession||"",joinedAt:new Date().toISOString()});
-      else au=au.map(x=>x.email===u.email?{...x,name:u.name,profession:u.profession||x.profession}:x);
-      await (window as any).storage.set("cobro-all-users",JSON.stringify(au),true);
-      setAllUsers(au);
+        const {data: profs} = await supabase.from('profiles').select('*');
+        if(profs) setAllUsers(profs.map(p=>({id:p.id, name:p.full_name, email:p.email, profession:p.profession})));
+        
+        const {data: allE} = await supabase.from('entries').select('*, profiles(email, full_name)');
+        if(allE) setAllEntries(allE.map(e=>({...e, userEmail: e.profiles?.email, userName: e.profiles?.full_name})));
     }catch{}
   };
 
-
-
-  const myTotal=entries.filter(e=>e.date===td()).reduce((s,e)=>s+e.amount,0);
-  const globalTotal=allEntries.filter(e=>e.date===td()).reduce((s,e)=>s+e.amount,0);
-  const targetPct=Math.min((myTotal/goal)*100,100);
-  useEffect(()=>{const t=setTimeout(()=>setAnimPct(targetPct),100);return()=>clearTimeout(t)},[targetPct]);
-
-
-
-  // === LOGIN ===
   const handleLogin=async()=>{
     if(!loginEmail.trim())return;
     setLoginLoading(true);setLoginError("");
     try{
-      let au: any[]=[];try{const r=await (window as any).storage.get("cobro-all-users",true);if(r)au=JSON.parse(r.value)}catch{}
-      const contact=au.find((u:any)=>u.email===loginEmail.trim());
+      const {data: contact} = await supabase.from('profiles').select('*').eq('email', loginEmail.trim()).maybeSingle();
       if(!contact){setLoginError("Email no registrado. ¿Eres nuevo? Regístrate primero.");setLoginLoading(false);return}
-      const u={name:`${contact.name||""}`.trim()||contact.email,email:contact.email,profession:contact.profession||""};
-      setUser(u);try{await (window as any).storage.set("cobro-user",JSON.stringify(u))}catch{}
-      setLoginEmail("");setScreen("main");await loadShared();
-    }catch(err: any){setLoginError(`Error: ${err.message}`)}
+      const u={id: contact.id, name:`${contact.full_name||""}`.trim()||contact.email,email:contact.email,profession:contact.profession||""};
+      setUser(u);localStorage.setItem("cobro-user",JSON.stringify(u));
+      setLoginEmail("");setScreen("main");
+      const {data: myE} = await supabase.from('entries').select('*').eq('user_id', u.id);
+      if(myE) setEntries(myE);
+      await loadShared();
+    }catch(err: any){setLoginError(`Error intern: ${err.message}`)}
     setLoginLoading(false);
   };
 
@@ -159,30 +143,65 @@ export default function App(){
     if(!regName.trim()||!regEmail.trim()||!regProf.trim())return;
     setLoginLoading(true);setLoginError("");
     try{
-      let au: any[]=[];try{const r=await (window as any).storage.get("cobro-all-users",true);if(r)au=JSON.parse(r.value)}catch{}
-      const existing=au.find((u:any)=>u.email===regEmail.trim());
+      const {data: existing} = await supabase.from('profiles').select('id').eq('email', regEmail.trim()).maybeSingle();
       if(existing){setLoginError("Este email ya está registrado. Inicia sesión.");setLoginLoading(false);return}
-      const u={name:regName.trim(),email:regEmail.trim(),profession:regProf.trim()};
-      setUser(u);try{await (window as any).storage.set("cobro-user",JSON.stringify(u))}catch{}
-      await registerSharedUser(u);
+      
+      const {data: newP, error} = await supabase.from('profiles').insert([{full_name: regName.trim(), email: regEmail.trim(), profession: regProf.trim()}]).select().single();
+      if (error) throw error;
+      
+      const u={id: newP.id, name:newP.full_name,email:newP.email,profession:newP.profession};
+      setUser(u);localStorage.setItem("cobro-user",JSON.stringify(u));
+      setEntries([]);
       setRegName("");setRegEmail("");setRegProf("");setScreen("main");await loadShared();
     }catch(err: any){setLoginError(`Error: ${err.message}`)}
     setLoginLoading(false);
   };
 
+  const myTotal=entries.filter(e=>e.date===td()).reduce((s,e)=>s+e.amount,0);
+  const globalTotal=allEntries.filter(e=>e.date===td()).reduce((s,e)=>s+e.amount,0);
+  const targetPct=Math.min((myTotal/goal)*100,100);
+  useEffect(()=>{const t=setTimeout(()=>setAnimPct(targetPct),100);return()=>clearTimeout(t)},[targetPct]);
+
   const handleCheckin=async()=>{
     const val=parseFloat(amount.replace(/[^0-9.]/g,""));if(!val||val<=0)return;
     const now=new Date();
-    const entry={id:Date.now().toString(),amount:val,date:td(),time:now.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}),ts:now.getTime()};
-    await saveEntries([...entries,entry]);setAmount("");setShowCheckin(false);
+    const ts = now.getTime();
+    const entry={user_id: user.id, amount:val,date:td(),time:now.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}),ts};
+    const {data, error} = await supabase.from('entries').insert([entry]).select().single();
+    if (!error && data) {
+         setEntries([...entries,data]);
+         setAllEntries([...allEntries, {...data, userEmail: user.email, userName: user.name}]);
+         
+         // Enviar al Webhook de FOMO
+         try {
+           await fetch("https://kbgvfrwgycayhuneuyfo.supabase.co/functions/v1/fomo-webhook", {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({
+               name: user.name,
+               occupation: user.profession || "Miembro",
+               amount: `${val} usd`
+             })
+           });
+         } catch(e) {
+           console.error("Error enviando webhook FOMO", e);
+         }
+    }
+    setAmount("");setShowCheckin(false);
   };
 
 
 
-  const handleGoal=async (v: number)=>{setGoal(v);try{await (window as any).storage.set("cobro-goal",String(v))}catch{}};
-  const handleLogout=async()=>{setUser(null);setScreen("login");setLoginMode("login");try{await (window as any).storage.delete("cobro-user")}catch{}};
+  const handleGoal=async (v: number)=>{setGoal(v);localStorage.setItem("cobro-goal",String(v));};
+  const handleLogout=async()=>{setUser(null);setScreen("login");setLoginMode("login");localStorage.removeItem("cobro-user");};
   const handleAdminLogin=async()=>{if(adminPass===ADMIN_PASS){await loadShared();setScreen("admin")}else{alert("Clave incorrecta")}};
-  const handleDelete=async (id: string)=>{await saveEntries(entries.filter(e=>e.id!==id))};
+  const handleDelete=async (id: string)=>{
+      const {error} = await supabase.from('entries').delete().eq('id', id);
+      if(!error) {
+          setEntries(entries.filter(e=>e.id!==id));
+          setAllEntries(allEntries.filter(e=>e.id!==id));
+      }
+  };
 
   const buildDay=(src: any[])=>src.filter(e=>e.date===td()).map(e=>({name:e.time||"",valor:e.amount}));
   const buildWeek=(src: any[])=>{const w=ws(td());return DAYS.map((d,i)=>{const dt=new Date(w+"T12:00:00");dt.setDate(dt.getDate()+i);const k=dt.toISOString().split("T")[0];return{name:d,valor:src.filter(e=>e.date===k).reduce((s,e)=>s+e.amount,0)}})};
