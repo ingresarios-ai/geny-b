@@ -270,11 +270,21 @@ export default function App(){
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div style={{textAlign:"center",marginBottom:16}}>
-                <div style={{fontSize:28,marginBottom:8}}>✨</div>
-                <p style={{color:C.muted,fontSize:13,lineHeight:"1.5",maxWidth:"280px",margin:"0 auto"}}>
-                  Usa el mismo correo con el que te inscribiste al entrenamiento para vincular tu cuenta.
-                </p>
+              <div style={{textAlign:"center",marginBottom:20}}>
+                <div style={{fontSize:32,marginBottom:12}}>✨</div>
+                <div style={{
+                  background: `${C.gold}12`,
+                  border: `1px solid ${C.gold}33`,
+                  borderRadius: 12,
+                  padding: "14px 18px",
+                  margin: "0 auto",
+                  maxWidth: "320px",
+                  boxShadow: `0 4px 12px rgba(0,0,0,0.1)`
+                }}>
+                  <p style={{color: C.gold, fontSize: 13, fontWeight: 700, lineHeight: "1.5", margin: 0}}>
+                    💡 IMPORTANTE: Usa el mismo correo con el que te inscribiste al entrenamiento para vincular tu progreso.
+                  </p>
+                </div>
               </div>
               <Input label="Nombre completo" value={regName} onChange={(e:any)=>setRegName(e.target.value)} placeholder="Tu nombre completo"/>
               <Input label="Email" value={regEmail} onChange={(e:any)=>setRegEmail(e.target.value)} placeholder="tu@email.com" type="email"/>
