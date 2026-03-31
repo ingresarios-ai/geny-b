@@ -4,14 +4,13 @@ import './index.css'
 import App from './App.tsx'
 
 (window as any).storage = {
-  get: async (key: string, shared: boolean = false) => {
-    const val = localStorage.getItem(key);
-    return val ? { value: val } : null;
+  get: async (key: string, _shared: boolean = false) => {
+    return { value: localStorage.getItem(key) };
   },
-  set: async (key: string, value: string, shared: boolean = false) => {
+  set: async (key: string, value: string, _shared: boolean = false) => {
     localStorage.setItem(key, value);
   },
-  delete: async (key: string, shared: boolean = false) => {
+  delete: async (key: string, _shared: boolean = false) => {
     localStorage.removeItem(key);
   }
 };
