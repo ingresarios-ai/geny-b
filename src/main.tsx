@@ -14,7 +14,7 @@ const Root = () => {
 
   return (
     <div style={{ background: "#000", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <img src="/logo.png" alt="Ingresarios" style={{ maxWidth: "80%", maxHeight: "80%", objectFit: "contain" }} />
+      <img src="/Ingresarios_logo_blanco.png" alt="Ingresarios" style={{ maxWidth: "80%", maxHeight: "80%", objectFit: "contain" }} />
     </div>
   );
 };
