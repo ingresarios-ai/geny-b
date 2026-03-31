@@ -253,7 +253,6 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{textAlign:"center",marginBottom:4}}>
                 <div style={{fontSize:28,marginBottom:6}}>✨</div>
-                <p style={{color:C.muted,fontSize:13,margin:0}}>Crea tu cuenta conectada a GHL</p>
               </div>
               <Input label="Nombre completo" value={regName} onChange={(e:any)=>setRegName(e.target.value)} placeholder="Tu nombre completo"/>
               <Input label="Email" value={regEmail} onChange={(e:any)=>setRegEmail(e.target.value)} placeholder="tu@email.com" type="email"/>
