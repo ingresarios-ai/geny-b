@@ -270,8 +270,11 @@ export default function App(){
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div style={{textAlign:"center",marginBottom:4}}>
-                <div style={{fontSize:28,marginBottom:6}}>✨</div>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:28,marginBottom:8}}>✨</div>
+                <p style={{color:C.muted,fontSize:13,lineHeight:"1.5",maxWidth:"280px",margin:"0 auto"}}>
+                  Usa el mismo correo con el que te inscribiste al entrenamiento para vincular tu cuenta.
+                </p>
               </div>
               <Input label="Nombre completo" value={regName} onChange={(e:any)=>setRegName(e.target.value)} placeholder="Tu nombre completo"/>
               <Input label="Email" value={regEmail} onChange={(e:any)=>setRegEmail(e.target.value)} placeholder="tu@email.com" type="email"/>
