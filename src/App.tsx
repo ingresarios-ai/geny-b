@@ -9,8 +9,8 @@ const C = {
 };
 const ADMIN_PASS="ingresarios2024";
 const UCOL=["#00e5ff","#ffd700","#00e676","#b388ff","#ff80ab","#ffab40","#ff5252","#64ffda","#ea80fc","#ffd740"];
-const fmt=(v:any)=>{if(v>=1e6)return`$${(v/1e6).toFixed(1)}M`;if(v>=1e3)return`$${(v/1e3).toFixed(1)}K`;return`$${v.toLocaleString()}`};
-const fmtF=(v:any)=>`$${Number(v).toLocaleString("es-CO")}`;
+const fmt=(v:any)=>{const a=Math.abs(v);const s=v<0?"-":"";if(a>=1e6)return`${s}$${(a/1e6).toFixed(1)}M`;if(a>=1e3)return`${s}$${(a/1e3).toFixed(1)}K`;return`${s}$${a.toLocaleString()}`};
+const fmtF=(v:any)=>{const n=Number(v);return n<0?`-$${Math.abs(n).toLocaleString("es-CO")}`:`$${n.toLocaleString("es-CO")}`};
 const td=()=>new Date().toISOString().split("T")[0];
 const ws=(d:any)=>{const dt=new Date(d+"T12:00:00");const dy=dt.getDay();dt.setDate(dt.getDate()-(dy===0?6:dy-1));return dt.toISOString().split("T")[0]};
 const DAYS=["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -70,6 +70,7 @@ export default function App(){
   const [view,setView]=useState("dia");
   const [goal,setGoal]=useState(20000);
   const [showCheckin,setShowCheckin]=useState(false);
+  const [checkinMode,setCheckinMode]=useState<"gain"|"loss">("gain");
   const [animPct,setAnimPct]=useState(0);
   const [syncSt,setSyncSt]=useState("idle");const [syncMsg,setSyncMsg]=useState("");
   const [splashOp,setSplashOp]=useState(0);
@@ -159,35 +160,38 @@ export default function App(){
 
   const myTotal=entries.filter(e=>e.date===td()).reduce((s,e)=>s+e.amount,0);
   const globalTotal=allEntries.filter(e=>e.date===td()).reduce((s,e)=>s+e.amount,0);
-  const targetPct=Math.min((myTotal/goal)*100,100);
+  const targetPct=Math.min(Math.max((myTotal/goal)*100,0),100);
   useEffect(()=>{const t=setTimeout(()=>setAnimPct(targetPct),100);return()=>clearTimeout(t)},[targetPct]);
 
   const handleCheckin=async()=>{
     const val=parseFloat(amount.replace(/[^0-9.]/g,""));if(!val||val<=0)return;
+    const finalAmount=checkinMode==="loss"?-val:val;
     const now=new Date();
     const ts = now.getTime();
-    const entry={user_id: user.id, amount:val,date:td(),time:now.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}),ts};
+    const entry={user_id: user.id, amount:finalAmount,date:td(),time:now.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}),ts};
     const {data, error} = await supabase.from('entries').insert([entry]).select().single();
     if (!error && data) {
          setEntries([...entries,data]);
          setAllEntries([...allEntries, {...data, userEmail: user.email, userName: user.name}]);
          
-         // Enviar al Webhook de FOMO
-         try {
-           await fetch("https://kbgvfrwgycayhuneuyfo.supabase.co/functions/v1/fomo-webhook", {
-             method: "POST",
-             headers: { "Content-Type": "application/json" },
-             body: JSON.stringify({
-               name: user.name,
-               occupation: user.profession || "Miembro",
-               amount: `${val} usd`
-             })
-           });
-         } catch(e) {
-           console.error("Error enviando webhook FOMO", e);
+         // Enviar al Webhook de FOMO solo en ganancias
+         if (checkinMode==="gain") {
+           try {
+             await fetch("https://kbgvfrwgycayhuneuyfo.supabase.co/functions/v1/fomo-webhook", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                 name: user.name,
+                 occupation: user.profession || "Miembro",
+                 amount: `${val} usd`
+               })
+             });
+           } catch(e) {
+             console.error("Error enviando webhook FOMO", e);
+           }
          }
     }
-    setAmount("");setShowCheckin(false);
+    setAmount("");setShowCheckin(false);setCheckinMode("gain");
   };
 
 
@@ -215,7 +219,7 @@ export default function App(){
     return Object.entries(map).map(([name,value]: any,i)=>({name,value,fill:UCOL[i%UCOL.length]}));
   };
 
-  const tColor=animPct<33?C.red:animPct<66?C.orange:C.green;
+  const tColor=myTotal<0?C.red:animPct<33?C.red:animPct<66?C.orange:C.green;
 
   const ps: any={background:C.bg,minHeight:"100vh",fontFamily:"'Segoe UI',system-ui,sans-serif",color:C.text};
 
@@ -224,7 +228,7 @@ export default function App(){
     period==="mes"?(
       <ResponsiveContainer width="100%" height={height}><LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.muted,fontSize:10}} interval={4}/><YAxis tick={{fill:C.muted,fontSize:10}} tickFormatter={fmt} width={48}/><Tooltip formatter={v=>fmtF(v)} contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,color:C.text}}/><Line type="monotone" dataKey="valor" stroke={C.accent} strokeWidth={2} dot={{fill:C.accent,r:3}}/></LineChart></ResponsiveContainer>
     ):(
-      <ResponsiveContainer width="100%" height={height}><BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.muted,fontSize:10}}/><YAxis tick={{fill:C.muted,fontSize:10}} tickFormatter={fmt} width={48}/><Tooltip formatter={v=>fmtF(v)} contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,color:C.text}}/><Bar dataKey="valor" radius={[6,6,0,0]}>{data.map((e:any,i:number)=><Cell key={i} fill={e.valor>0?C.accent:C.border}/>)}</Bar></BarChart></ResponsiveContainer>
+      <ResponsiveContainer width="100%" height={height}><BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.muted,fontSize:10}}/><YAxis tick={{fill:C.muted,fontSize:10}} tickFormatter={fmt} width={48}/><Tooltip formatter={v=>fmtF(v)} contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,color:C.text}}/><Bar dataKey="valor" radius={[6,6,0,0]}>{data.map((e:any,i:number)=><Cell key={i} fill={e.valor>0?C.accent:e.valor<0?C.red:C.border}/>)}</Bar></BarChart></ResponsiveContainer>
     )
   );
 
@@ -399,7 +403,7 @@ export default function App(){
               {selectedUser&&(()=>{const ue=allEntries.filter(e=>e.userEmail===selectedUser&&e.date===td());if(!ue.length)return null;return(
                 <div style={{background:C.card,borderRadius:14,padding:14,border:`1px solid ${C.border}`}}>
                   <div style={{fontSize:13,fontWeight:600,marginBottom:10,color:C.muted}}>Cobros hoy ({ue.length})</div>
-                  {ue.map(e=><div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.bg,borderRadius:8,marginBottom:4}}><span style={{fontWeight:600,color:C.green,fontSize:13}}>{fmtF(e.amount)}</span><span style={{color:C.muted,fontSize:11}}>{e.time}</span></div>)}
+                  {ue.map(e=><div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.bg,borderRadius:8,marginBottom:4}}><span style={{fontWeight:600,color:e.amount>=0?C.green:C.red,fontSize:13}}>{e.amount>=0?"+":""}{fmtF(e.amount)}</span><span style={{color:C.muted,fontSize:11}}>{e.time}</span></div>)}
                 </div>)})()}
             </>
           )}
@@ -448,21 +452,29 @@ export default function App(){
           </div>
         </div>
 
-        {!showCheckin?<Btn onClick={()=>setShowCheckin(true)} style={{width:"100%",padding:18,borderRadius:14,background:`linear-gradient(135deg,${C.green},#00a854)`,color:C.bg,fontSize:20,fontWeight:800,marginBottom:14,boxShadow:`0 6px 24px ${C.green}33`}}>💵 ¡Ya Cobré!</Btn>:(
-          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.green}33`}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:10}}>💵 Registrar cobro</div>
+        {!showCheckin?(
+          <div style={{display:"flex",gap:10,marginBottom:14}}>
+            <Btn onClick={()=>{setCheckinMode("gain");setShowCheckin(true)}} style={{flex:1,padding:18,borderRadius:14,background:`linear-gradient(135deg,${C.green},#00a854)`,color:C.bg,fontSize:18,fontWeight:800,boxShadow:`0 6px 24px ${C.green}33`}}>💵 ¡Ya Cobré!</Btn>
+            <Btn onClick={()=>{setCheckinMode("loss");setShowCheckin(true)}} style={{flex:1,padding:18,borderRadius:14,background:`linear-gradient(135deg,${C.red},#d32f2f)`,color:"white",fontSize:18,fontWeight:800,boxShadow:`0 6px 24px ${C.red}33`}}>📉 Pérdida</Btn>
+          </div>
+        ):(
+          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${checkinMode==="loss"?C.red+"55":C.green+"33"}`}}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:10,color:checkinMode==="loss"?C.red:C.text}}>{checkinMode==="loss"?"📉 Registrar pérdida":"💵 Registrar cobro"}</div>
             <div style={{display:"flex",gap:8}}>
-              <input value={amount} onChange={(e:any)=>setAmount(e.target.value)} placeholder="Valor" type="number" autoFocus style={{flex:1,padding:"12px 14px",borderRadius:10,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:18,outline:"none"}} onKeyDown={(e:any)=>e.key==="Enter"&&handleCheckin()}/>
-              <Btn onClick={handleCheckin} style={{padding:"12px 18px",background:C.green,color:C.bg,fontSize:14,fontWeight:800}}>✓</Btn>
-              <Btn onClick={()=>{setShowCheckin(false);setAmount("")}} style={{padding:"12px 14px",background:"transparent",border:`1px solid ${C.border}`,color:C.muted,fontSize:14}}>✕</Btn>
+              <div style={{position:"relative",flex:1}}>
+                {checkinMode==="loss"&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:C.red,fontSize:18,fontWeight:800,zIndex:1}}>−</span>}
+                <input value={amount} onChange={(e:any)=>setAmount(e.target.value)} placeholder="Valor" type="number" min="0" autoFocus style={{width:"100%",padding:"12px 14px",paddingLeft:checkinMode==="loss"?32:14,borderRadius:10,border:`1px solid ${checkinMode==="loss"?C.red+"55":C.border}`,background:C.bg,color:checkinMode==="loss"?C.red:C.text,fontSize:18,outline:"none",boxSizing:"border-box"}} onKeyDown={(e:any)=>e.key==="Enter"&&handleCheckin()}/>
+              </div>
+              <Btn onClick={handleCheckin} style={{padding:"12px 18px",background:checkinMode==="loss"?C.red:C.green,color:checkinMode==="loss"?"white":C.bg,fontSize:14,fontWeight:800}}>✓</Btn>
+              <Btn onClick={()=>{setShowCheckin(false);setAmount("");setCheckinMode("gain")}} style={{padding:"12px 14px",background:"transparent",border:`1px solid ${C.border}`,color:C.muted,fontSize:14}}>✕</Btn>
             </div>
           </div>
         )}
 
         {todayEntries.length>0&&<div style={{background:C.card,borderRadius:14,padding:14,marginBottom:14,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:13,fontWeight:600,marginBottom:10,color:C.muted}}>Mis cobros hoy ({todayEntries.length})</div>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:10,color:C.muted}}>Mis movimientos hoy ({todayEntries.length})</div>
           {todayEntries.map((e:any)=><div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:C.bg,borderRadius:8,marginBottom:4}}>
-            <div><span style={{fontWeight:700,color:C.green}}>{fmtF(e.amount)}</span><span style={{color:C.muted,fontSize:11,marginLeft:8}}>{e.time}</span></div>
+            <div><span style={{fontWeight:700,color:e.amount>=0?C.green:C.red}}>{e.amount>=0?"+":""}{fmtF(e.amount)}</span><span style={{color:C.muted,fontSize:11,marginLeft:8}}>{e.time}</span></div>
             <Btn onClick={()=>handleDelete(e.id)} style={{background:"transparent",border:"none",color:C.muted,fontSize:15,padding:"2px 6px"}}>×</Btn>
           </div>)}
         </div>}
