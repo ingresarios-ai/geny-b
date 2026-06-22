@@ -1,13 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Registro from './pages/Registro';
-import Gracias from './pages/Gracias';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/registro" element={<Registro />} />
-        <Route path="/gracias" element={<Gracias />} />
         {/* Placeholder: redirigir al main app por ahora */}
         <Route path="/app" element={
           <div style={{
