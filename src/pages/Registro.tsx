@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Eye, EyeOff, Lock, User, Mail, CheckCircle, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 
-const SUPABASE_FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
+const SUPABASE_FUNCTIONS_URL = (import.meta.env.VITE_SUPABASE_URL || 'https://fduresfcgczpiijfzmeb.supabase.co') + '/functions/v1';
 
 interface Invitation {
   name: string;
