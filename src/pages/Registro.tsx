@@ -179,7 +179,7 @@ export default function Registro() {
             <p style={styles.successText}>
               Tu cuenta ha sido creada exitosamente. Ya puedes acceder a la plataforma.
             </p>
-            <a href="/app" style={styles.ctaButton}>
+            <a href="https://genyapp.ingresarios.ai/geny" style={styles.ctaButton}>
               Ir a la plataforma →
             </a>
           </div>

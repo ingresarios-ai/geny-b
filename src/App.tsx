@@ -1,35 +1,37 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import Registro from './pages/Registro';
+
+const APP_URL = 'https://genyapp.ingresarios.ai/geny';
+
+function ExternalRedirect({ url }: { url: string }) {
+  useEffect(() => {
+    window.location.href = url;
+  }, [url]);
+
+  return (
+    <div style={{
+      background: '#0a0e1a',
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: '#7b8cad',
+      fontSize: 14,
+    }}>
+      Redirigiendo a la plataforma...
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/registro" element={<Registro />} />
-        {/* Placeholder: redirigir al main app por ahora */}
-        <Route path="/app" element={
-          <div style={{
-            background: '#0a0e1a',
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: "'Segoe UI', system-ui, sans-serif",
-            color: '#f0f4ff',
-          }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: 16,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, #ffd700, #c5a300)',
-              boxShadow: '0 4px 24px #ffd70044',
-              fontSize: 29, fontWeight: 900, color: '#0a0e1a',
-              marginBottom: 20,
-            }}>G</div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px', color: '#FFD700' }}>GENY</h1>
-            <p style={{ fontSize: 14, color: '#7b8cad' }}>Bienvenido a la plataforma</p>
-          </div>
-        } />
+        {/* Redirigir /app a la app real */}
+        <Route path="/app" element={<ExternalRedirect url={APP_URL} />} />
         {/* Ruta raíz: splash con logo */}
         <Route path="/" element={
           <div style={{ background: '#000', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
