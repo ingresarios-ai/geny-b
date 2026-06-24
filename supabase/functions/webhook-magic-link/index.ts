@@ -11,6 +11,8 @@ const GHL_API_BASE = "https://services.leadconnectorhq.com";
 
 async function updateGHLContact(contactId: string, magicLink: string): Promise<void> {
   try {
+    // GHL API v2 expects customFields as array of { id, field_value } or { key, field_value }
+    // Using 'key' (field key name) works with API version 2021-07-28
     const res = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
       method: "PUT",
       headers: {
@@ -21,8 +23,8 @@ async function updateGHLContact(contactId: string, magicLink: string): Promise<v
       body: JSON.stringify({
         customFields: [
           {
-            key: "webhook_magic_link_geny_b",
-            field_value: magicLink,
+            id: "webhook_magic_link_geny_b",
+            value: magicLink,
           },
         ],
       }),
@@ -31,8 +33,14 @@ async function updateGHLContact(contactId: string, magicLink: string): Promise<v
     if (!res.ok) {
       const errorBody = await res.text();
       console.error(`GHL update failed (${res.status}):`, errorBody);
+      
+      // If the field key didn't work, log it for debugging
+      if (res.status === 422 || res.status === 400) {
+        console.error("The custom field ID might be wrong. Try using the actual field ID from GHL.");
+      }
     } else {
-      console.log("GHL contact updated successfully with magic link");
+      const responseData = await res.json();
+      console.log("GHL contact updated successfully:", JSON.stringify(responseData));
     }
   } catch (err) {
     console.error("GHL API error:", err);
@@ -62,11 +70,44 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, email, contact_id } = body;
+
+    // Log raw payload for debugging GHL integration
+    console.log("Webhook received body:", JSON.stringify(body));
+
+    // Flexible field extraction — GHL sends data in various formats
+    const name = body.name
+      || body.full_name
+      || body.fullName
+      || body.contact_name
+      || body.contactName
+      || (body.first_name || body.firstName || "")
+        + ((body.first_name || body.firstName) && (body.last_name || body.lastName) ? " " : "")
+        + (body.last_name || body.lastName || "")
+      || body.contact?.name
+      || body.contact?.full_name
+      || ((body.contact?.first_name || "") + " " + (body.contact?.last_name || "")).trim()
+      || null;
+
+    const email = body.email
+      || body.contact_email
+      || body.contactEmail
+      || body.contact?.email
+      || null;
+
+    const contact_id = body.contact_id
+      || body.contactId
+      || body.contact?.id
+      || body.id
+      || null;
 
     if (!name || !email) {
+      console.error("Missing fields. Extracted name:", name, "email:", email, "from body keys:", Object.keys(body));
       return new Response(
-        JSON.stringify({ error: "Missing required fields: name, email" }),
+        JSON.stringify({
+          error: "Missing required fields: name, email",
+          received_keys: Object.keys(body),
+          extracted: { name: name || null, email: email || null },
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -121,6 +162,8 @@ Deno.serve(async (req) => {
     const magicLink = `${APP_URL}/registro?token=${token}`;
 
     // Update GHL contact with magic link if contact_id is provided
+    console.log("contact_id:", contact_id, "magicLink:", magicLink);
+    console.log("GHL_API_KEY present:", !!GHL_API_KEY, "prefix:", GHL_API_KEY?.substring(0, 8));
     if (contact_id) {
       await updateGHLContact(contact_id, magicLink);
     } else {
