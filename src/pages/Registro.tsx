@@ -123,11 +123,11 @@ export default function Registro() {
       });
 
       if (loginError) {
-        // Account was created but login failed — still show success
         console.warn('Auto-login failed:', loginError);
       }
 
-      setPageState('success');
+      // Redirect directly to the app
+      window.location.href = 'https://genyapp.ingresarios.ai/geny';
     } catch (_err) {
       setFormError('Error de conexión. Verifica tu internet e intenta de nuevo.');
       setSubmitting(false);
